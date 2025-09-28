@@ -1,267 +1,234 @@
-<div class="container-fluid">
-    <h1 class="h2 mb-4 text-gray-800"><?= $title; ?></h1>
+<?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<?php $this->load->view('header'); ?>
+
+<div class="container-fluid py-5" id="transactionsApp">
+    <h1 class="h2 mb-4 text-gray-800">{{ title }}</h1>
 
     <!-- Add Transaction Modal -->
-    <div class="modal fade" id="addTransactionModal" tabindex="-1" role="dialog" aria-labelledby="addTransactionModalLabel" aria-hidden="true">
+    <div class="modal fade" id="addTransactionModal" tabindex="-1" aria-hidden="true" ref="addModal">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header" style="background-color: #a8d8ea; color: #fff;">
-                    <h5 class="modal-title" id="addTransactionModalLabel">Add Transaction</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                <div class="modal-header" style="background-color:#a8d8ea;color:#fff;">
+                    <h5 class="modal-title">Add Transaction</h5>
+                    <button type="button" class="btn-close" @click="closeAddModal"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" id="csrf_name" value="<?= $this->security->get_csrf_token_name(); ?>">
-                    <input type="hidden" id="csrf_hash" value="<?= $this->security->get_csrf_hash(); ?>">
-                    <div class="form-group">
-                        <label>Title</label>
-                        <input type="text" id="title" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Amount</label>
-                        <input type="number" step="0.01" id="amount" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Type</label>
-                        <select id="type" class="form-control">
-                            <option value="income">Income</option>
-                            <option value="expense">Expense</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select id="category_id" class="form-control">
-                            <?php foreach($categories as $c): ?>
-                                <option value="<?= $c->id ?>"><?= $c->name ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Date</label>
-                        <input type="date" id="occurred_at" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Notes</label>
-                        <textarea id="notes" class="form-control"></textarea>
-                    </div>
-                    <button class="btn btn-primary btn-sm" onclick="addTransaction()">Add Transaction</button>
+                    <form @submit.prevent="addTransaction">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" v-model="newTransaction.title" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" v-model.number="newTransaction.amount" step="0.01" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select v-model="newTransaction.type" class="form-control" required>
+                                <option value="income">Income</option>
+                                <option value="expense">Expense</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select v-model="newTransaction.category_id" class="form-control">
+                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" v-model="newTransaction.occurred_at" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea v-model="newTransaction.notes" class="form-control"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Add Transaction</button>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Edit Transaction Modal -->
-    <div class="modal fade" id="editTransactionModal" tabindex="-1" role="dialog" aria-labelledby="editTransactionModalLabel" aria-hidden="true">
+    <div class="modal fade" id="editTransactionModal" tabindex="-1" aria-hidden="true" ref="editModal">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header" style="background-color: #a8d8ea; color: #fff;">
-                    <h5 class="modal-title" id="editTransactionModalLabel">Edit Transaction</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                <div class="modal-header" style="background-color:#a8d8ea;color:#fff;">
+                    <h5 class="modal-title">Edit Transaction</h5>
+                    <button type="button" class="btn-close" @click="closeEditModal"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" id="edit_transaction_id">
-                    <div class="form-group">
-                        <label>Title</label>
-                        <input type="text" id="edit_title" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Amount</label>
-                        <input type="number" step="0.01" id="edit_amount" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Type</label>
-                        <select id="edit_type" class="form-control">
-                            <option value="income">Income</option>
-                            <option value="expense">Expense</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select id="edit_category_id" class="form-control">
-                            <?php foreach($categories as $c): ?>
-                                <option value="<?= $c->id ?>"><?= $c->name ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Date</label>
-                        <input type="date" id="edit_occurred_at" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label>Notes</label>
-                        <textarea id="edit_notes" class="form-control"></textarea>
-                    </div>
-                    <button class="btn btn-primary btn-sm" onclick="updateTransaction()">Update Transaction</button>
+                    <form @submit.prevent="editTransaction">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" v-model="selectedTransaction.title" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" v-model.number="selectedTransaction.amount" step="0.01" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select v-model="selectedTransaction.type" class="form-control" required>
+                                <option value="income">Income</option>
+                                <option value="expense">Expense</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select v-model="selectedTransaction.category_id" class="form-control">
+                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" v-model="selectedTransaction.occurred_at" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea v-model="selectedTransaction.notes" class="form-control"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Update Transaction</button>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Search Form & Table -->
+    <!-- Search -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-dark">Search Transactions</h6>
         </div>
         <div class="card-body">
             <div class="row g-2 mb-2">
-                <div class="col-md-3"><input type="text" id="search" class="form-control" placeholder="Search title"></div>
+                <div class="col-md-3"><input type="text" v-model="searchQuery" class="form-control" placeholder="Search title"></div>
                 <div class="col-md-2">
-                    <select id="search_type" class="form-control">
+                    <select v-model="searchType" class="form-control">
                         <option value="">All Types</option>
                         <option value="income">Income</option>
                         <option value="expense">Expense</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <select id="search_category" class="form-control">
+                    <select v-model="searchCategory" class="form-control">
                         <option value="">All Categories</option>
-                        <?php foreach($categories as $c): ?>
-                            <option value="<?= $c->id ?>"><?= $c->name ?></option>
-                        <?php endforeach; ?>
+                        <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                     </select>
                 </div>
-                <div class="col-md-2"><input type="date" id="start_date" class="form-control"></div>
-                <div class="col-md-2"><input type="date" id="end_date" class="form-control"></div>
+                <div class="col-md-2"><input type="date" v-model="startDate" class="form-control"></div>
+                <div class="col-md-2"><input type="date" v-model="endDate" class="form-control"></div>
             </div>
-            <button class="btn btn-primary btn-sm mr-2" onclick="searchTransactions()">Search</button>
-            <button class="btn btn-secondary btn-sm" onclick="resetSearch()">Reset</button>
+            <button class="btn btn-primary btn-sm mr-2" @click="searchTransactions">Search</button>
+            <button class="btn btn-secondary btn-sm" @click="resetSearch">Reset</button>
         </div>
     </div>
 
+    <!-- Transactions Table -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-dark">Transactions</h6>
-            <button class="btn btn-primary btn-sm float-right" data-toggle="modal" data-target="#addTransactionModal">Add Transaction</button>
+            <button class="btn btn-primary btn-sm float-right" @click="openAddModal">Add Transaction</button>
         </div>
         <div class="card-body">
-            <table class="table table-bordered table-striped" id="transactions-table">
+            <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
                         <th>Title</th><th>Amount</th><th>Type</th><th>Category</th><th>Date</th><th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach($transactions as $t): ?>
-                        <tr data-id="<?= $t->id ?>">
-                            <td><?= htmlspecialchars($t->title) ?></td>
-                            <td>$<?= number_format($t->amount,2) ?></td>
-                            <td><?= ucfirst($t->type) ?></td>
-                            <td><?= htmlspecialchars($t->category_name ?: 'Uncategorized') ?></td>
-                            <td><?= date('Y-m-d', strtotime($t->occurred_at)) ?></td>
-                            <td>
-                                <button class="btn btn-warning btn-sm" onclick="editTransaction(<?= $t->id ?>)">Edit</button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteTransaction(<?= $t->id ?>)">Delete</button>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>   
+                    <tr v-for="t in filteredTransactions" :key="t.id">
+                        <td>{{ t.title }}</td>
+                        <td>$ {{ t.amount.toFixed(2) }}</td>
+                        <td>{{ capitalize(t.type) }}</td>
+                        <td>{{ t.category_name || 'Uncategorized' }}</td>
+                        <td>{{ t.occurred_at }}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" @click="openEditModal(t)">Edit</button>
+                            <button class="btn btn-danger btn-sm" @click="deleteTransaction(t.id)">Delete</button>
+                        </td>
+                    </tr>
+                    <tr v-if="filteredTransactions.length===0">
+                        <td colspan="6" class="text-center">No transactions found</td>
+                    </tr>
+                </tbody>
             </table>
-            <!-- pagination--> 
-            <div class="mt-3">
-            <ul class="pagination justify-content-center">    
-            <?= $links ?>
-            </ul>
-            </div>
-
         </div>
     </div>
 </div>
 
 <script>
-function getCsrf() {
-    return {
-        name: $('#csrf_name').val(),
-        hash: $('#csrf_hash').val()
-    };
-}
+const { createApp, ref } = Vue;
 
-function refreshCsrf(token){
-    $('#csrf_hash').val(token);
-}
-
-function addTransaction(){
-    let csrf = getCsrf();
-    $.post('<?= base_url("transactions/create") ?>', {
-        [csrf.name]: csrf.hash,
-        title: $('#title').val(),
-        amount: $('#amount').val(),
-        type: $('#type').val(),
-        category_id: $('#category_id').val(),
-        occurred_at: $('#occurred_at').val(),
-        notes: $('#notes').val()
-    }, function(res){
-        if(res.status==='success'){
-            alert(res.message);
-            $('#addTransactionModal').modal('hide');
-            location.reload();
-        }else alert(res.message);
-    }, 'json');
-}
-
-function editTransaction(id){
-    $.get('<?= base_url("transactions/get_transaction/") ?>'+id, function(res){
-        if(res.status==='error'){ alert(res.message); return; }
-        $('#edit_transaction_id').val(res.id);
-        $('#edit_title').val(res.title);
-        $('#edit_amount').val(res.amount);
-        $('#edit_type').val(res.type);
-        $('#edit_category_id').val(res.category_id);
-        $('#edit_occurred_at').val(res.occurred_at.split(' ')[0]);
-        $('#edit_notes').val(res.notes);
-        $('#editTransactionModal').modal('show');
-    }, 'json');
-}
-
-function updateTransaction(){
-    let id = $('#edit_transaction_id').val();
-    let csrf = getCsrf();
-    $.post('<?= base_url("transactions/edit/") ?>'+id, {
-        [csrf.name]: csrf.hash,
-        title: $('#edit_title').val(),
-        amount: $('#edit_amount').val(),
-        type: $('#edit_type').val(),
-        category_id: $('#edit_category_id').val(),
-        occurred_at: $('#edit_occurred_at').val(),
-        notes: $('#edit_notes').val()
-    }, function(res){
-        if(res.status==='success'){
-            alert(res.message);
-            $('#editTransactionModal').modal('hide');
-            location.reload();
-        }else alert(res.message);
-    }, 'json');
-}
-
-function deleteTransaction(id){
-    if(!confirm('Are you sure?')) return;
-    let csrf = getCsrf();
-    $.post('<?= base_url("transactions/delete/") ?>'+id, {[csrf.name]: csrf.hash}, function(res){
-        if(res.status==='success'){ alert(res.message); location.reload(); }
-        else alert(res.message);
-    }, 'json');
-}
-
-function searchTransactions(){
-    $.get('<?= base_url("transactions/search") ?>', {
-        search: $('#search').val(),
-        type: $('#search_type').val(),
-        category_id: $('#search_category').val(),
-        start_date: $('#start_date').val(),
-        end_date: $('#end_date').val()
-    }, function(res){
-        if(res.status==='success'){
-            let tbody = $('#transactions-table tbody'); tbody.empty();
-            if(!res.data.length){ tbody.append('<tr><td colspan="6" class="text-center">No transactions found</td></tr>'); return; }
-            res.data.forEach(t=>{
-                let d = t.occurred_at? new Date(t.occurred_at).toISOString().split('T')[0]:'';
-                tbody.append(`<tr data-id="${t.id}"><td>${t.title}</td><td>$${parseFloat(t.amount).toFixed(2)}</td><td>${t.type.charAt(0).toUpperCase()+t.type.slice(1)}</td><td>${t.category_name||'Uncategorized'}</td><td>${d}</td><td><button class="btn btn-sm btn-warning" onclick="editTransaction(${t.id})">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteTransaction(${t.id})">Delete</button></td></tr>`);
+createApp({
+    data() {
+        return {
+            title: '<?php echo $title; ?>',
+            transactions: <?php echo json_encode($transactions); ?>,
+            categories: <?php echo json_encode($categories); ?>,
+            newTransaction: { title:'', amount:0, type:'income', category_id:'', occurred_at:'', notes:'' },
+            selectedTransaction: {},
+            searchQuery: '',
+            searchType: '',
+            searchCategory: '',
+            startDate: '',
+            endDate: ''
+        }
+    },
+    computed: {
+        filteredTransactions() {
+            return this.transactions.filter(t => {
+                const titleMatch = t.title.toLowerCase().includes(this.searchQuery.toLowerCase());
+                const typeMatch = !this.searchType || t.type===this.searchType;
+                const categoryMatch = !this.searchCategory || t.category_id==this.searchCategory;
+                const dateMatch = (!this.startDate || t.occurred_at>=this.startDate) && (!this.endDate || t.occurred_at<=this.endDate);
+                return titleMatch && typeMatch && categoryMatch && dateMatch;
             });
-        }else alert(res.message);
-    }, 'json');
-}
-
-function resetSearch(){ $('#search').val(''); $('#search_type').val(''); $('#search_category').val(''); $('#start_date').val(''); $('#end_date').val(''); searchTransactions(); }
+        }
+    },
+    methods: {
+        capitalize(str){ return str.charAt(0).toUpperCase() + str.slice(1); },
+        openAddModal(){ new bootstrap.Modal(this.$refs.addModal).show(); },
+        closeAddModal(){ new bootstrap.Modal(this.$refs.addModal).hide(); },
+        openEditModal(t){ this.selectedTransaction = {...t}; new bootstrap.Modal(this.$refs.editModal).show(); },
+        closeEditModal(){ new bootstrap.Modal(this.$refs.editModal).hide(); },
+        async addTransaction(){
+            try {
+                const formData = new FormData();
+                for (let key in this.newTransaction) formData.append(key, this.newTransaction[key]);
+                const res = await axios.post('<?php echo base_url("transactions/add"); ?>', formData);
+                if(res.data.status==='success'){
+                    this.transactions.push(res.data.transaction);
+                    this.newTransaction={ title:'', amount:0, type:'income', category_id:'', occurred_at:'', notes:'' };
+                    this.closeAddModal();
+                } else { alert(res.data.message); }
+            } catch(e){ console.error(e); alert('Error adding transaction'); }
+        },
+        async editTransaction(){
+            try {
+                const formData = new FormData();
+                for (let key in this.selectedTransaction) formData.append(key, this.selectedTransaction[key]);
+                const res = await axios.post('<?php echo base_url("transactions/edit"); ?>', formData);
+                if(res.data.status==='success'){
+                    const idx = this.transactions.findIndex(t=>t.id===this.selectedTransaction.id);
+                    this.transactions[idx] = res.data.transaction;
+                    this.closeEditModal();
+                } else { alert(res.data.message); }
+            } catch(e){ console.error(e); alert('Error editing transaction'); }
+        },
+        async deleteTransaction(id){
+            if(!confirm('Are you sure?')) return;
+            try{
+                const res = await axios.post('<?php echo base_url("transactions/delete"); ?>',{id});
+                if(res.data.status==='success') this.transactions = this.transactions.filter(t=>t.id!==id);
+            }catch(e){ console.error(e); alert('Error deleting transaction'); }
+        },
+        searchTransactions(){ /* computed handles filtering */ },
+        resetSearch(){ this.searchQuery=''; this.searchType=''; this.searchCategory=''; this.startDate=''; this.endDate=''; }
+    }
+}).mount('#transactionsApp');
 </script>
+
+<?php $this->load->view('footer'); ?>

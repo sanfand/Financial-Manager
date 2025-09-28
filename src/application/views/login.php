@@ -1,44 +1,74 @@
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-        <div class="card shadow">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-dark text-center">Login</h6>
-            </div>
-            <div class="card-body">
-                <?php if ($this->session->flashdata('success')): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <?php echo $this->session->flashdata('success'); ?>
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                <?php endif; ?>
-                <?php if ($this->session->flashdata('error')): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <?php echo $this->session->flashdata('error'); ?>
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                <?php endif; ?>
-                <?php echo validation_errors('<div class="alert alert-danger alert-dismissible fade show" role="alert">', '<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>'); ?>
+<?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<?php $this->load->view('header'); ?>
 
-                <?php echo form_open('auth/login'); ?>
-                    <div class="form-group">
-                        <label for="email" class="form-label">Email address or Username</label>
-                        <input type="text" name="login" id="login" class="form-control" value="<?php echo set_value('login'); ?>" required>
+<div class="container-fluid py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow" id="loginApp">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-dark text-center">Login</h6>
+                </div>
+                <div class="card-body">
+                    <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+                        {{ errorMessage }}
+                        <button type="button" class="btn-close" @click="errorMessage = ''"></button>
                     </div>
-                    <div class="form-group">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" name="password" id="password" class="form-control" required>
+                    <form @submit.prevent="login">
+                        <div class="form-group mb-3">
+                            <label for="username_email" class="form-label">Username or Email</label>
+                            <input type="text" v-model="usernameEmail" id="username_email" class="form-control" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" v-model="password" id="password" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    </form>
+                    <div class="mt-3 text-center">
+                        <small>Don't have an account? <a href="<?php echo base_url('auth/register'); ?>">Register here</a></small>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
-                <?php echo form_close(); ?>
-
-                <div class="mt-3 text-center">
-                    <small>Don't have an account? <a href="<?php echo base_url('auth/register'); ?>">Register here</a></small>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            usernameEmail: '',
+            password: '',
+            errorMessage: ''
+        }
+    },
+    methods: {
+        async login() {
+            this.errorMessage = ''; 
+            try {
+                const formData = new FormData();
+                formData.append('username_email', this.usernameEmail.trim());
+                formData.append('password', this.password);
+
+                const response = await axios.post('<?php echo base_url('auth/login'); ?>', formData, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = response.data;
+
+                if (data.status === 'success') {
+                    window.location.href = '<?php echo base_url('dashboard'); ?>';
+                } else {
+                    this.errorMessage = data.message || 'Login failed. Please try again.';
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                this.errorMessage = err.response?.data?.message || 'Server error. Please try again later.';
+            }
+        }
+    }
+}).mount('#loginApp');
+</script>
+
+<?php $this->load->view('footer'); ?>

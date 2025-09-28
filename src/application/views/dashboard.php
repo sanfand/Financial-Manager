@@ -1,7 +1,12 @@
-<div class="container-fluid">
-    <h1 class="h2 mb-4 text-gray-800"><?= $title; ?></h1>
-    
-    <!-- Financial Summary -->
+<?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<?php $this->load->view('header'); ?>
+
+<div class="container-fluid py-5" id="app">
+    <h1 class="h2 mb-4 text-gray-800">{{ title }}</h1>
+    <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ errorMessage }}
+        <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+    </div>
     <div class="row">
         <div class="col-md-4">
             <div class="card shadow mb-4" style="background-color: #b5ead7;">
@@ -9,7 +14,7 @@
                     <h6 class="m-0 font-weight-bold text-dark">Total Income</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="card-title">$<?= number_format($summary['income'], 2); ?></h5>
+                    <h5 class="card-title">$ {{ summary.income.toFixed(2) }}</h5>
                 </div>
             </div>
         </div>
@@ -19,7 +24,7 @@
                     <h6 class="m-0 font-weight-bold text-dark">Total Expenses</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="card-title">$<?= number_format($summary['expense'], 2); ?></h5>
+                    <h5 class="card-title">$ {{ summary.expense.toFixed(2) }}</h5>
                 </div>
             </div>
         </div>
@@ -29,23 +34,19 @@
                     <h6 class="m-0 font-weight-bold text-dark">Balance</h6>
                 </div>
                 <div class="card-body">
-                    <h5 class="card-title">$<?= number_format($summary['balance'], 2); ?></h5>
+                    <h5 class="card-title">$ {{ summary.balance.toFixed(2) }}</h5>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Monthly Trends Chart -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-dark">Monthly Trends</h6>
         </div>
-        <div class="card-body" style="min-height:400px;">
-            <canvas id="trendsChart" style="height:400px; width:100%;"></canvas>
+        <div class="card-body" style="min-height: 400px; position: relative;">
+            <canvas ref="trendsChart" style="height: 400px; width: 100%;"></canvas>
         </div>
     </div>
-
-    <!-- Recent Transactions -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-dark">Recent Transactions</h6>
@@ -62,73 +63,94 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($recent_transactions as $transaction): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($transaction->title); ?></td>
-                            <td>$<?= number_format($transaction->amount, 2); ?></td>
-                            <td><?= ucfirst($transaction->type); ?></td>
-                            <td><?= htmlspecialchars($transaction->category_name ?: 'Uncategorized'); ?></td>
-                            <td><?= date('M d, Y', strtotime($transaction->occurred_at)); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
+                    <tr v-for="transaction in recentTransactions" :key="transaction.id">
+                        <td>{{ transaction.title || 'N/A' }}</td>
+                        <td>$ {{ (transaction.amount || 0).toFixed(2) }}</td>
+                        <td>{{ transaction.type ? transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1) : 'N/A' }}</td>
+                        <td>{{ transaction.category_name || 'Uncategorized' }}</td>
+                        <td>{{ transaction.occurred_at ? new Date(transaction.occurred_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A' }}</td>
+                    </tr>
                 </tbody>
             </table>
-            <a href="<?= base_url('transactions'); ?>" class="btn btn-primary btn-sm">View All Transactions</a>
+            <a href="<?php echo base_url('transactions'); ?>" class="btn btn-primary btn-sm">View All Transactions</a>
         </div>
     </div>
 </div>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    fetch('<?= base_url('dashboard/get_chart_data'); ?>')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Chart Data:', data);
+const { createApp } = Vue;
 
-            if (!data || !data.labels || !data.income || !data.expense) {
-                console.error('Invalid chart data format:', data);
-                return;
-            }
+createApp({
+    data() {
+        return {
+            title: '<?php echo isset($title) ? addslashes($title) : 'Financial Dashboard'; ?>',
+            summary: {
+                income: <?php echo isset($summary['income']) ? floatval($summary['income']) : 0; ?>,
+                expense: <?php echo isset($summary['expense']) ? floatval($summary['expense']) : 0; ?>,
+                balance: <?php echo isset($summary['balance']) ? floatval($summary['balance']) : 0; ?>
+            },
+            recentTransactions: <?php echo isset($recent_transactions) ? json_encode($recent_transactions) : '[]'; ?>,
+            errorMessage: ''
+        }
+    },
+    mounted() {
+        this.loadChart();
+    },
+    methods: {
+        async loadChart() {
+            try {
+                const response = await axios.get('<?php echo base_url('dashboard/get_chart_data'); ?>', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = response.data;
+                if (!data.labels || !Array.isArray(data.income) || !Array.isArray(data.expense)) {
+                    this.errorMessage = 'Invalid chart data format. Please check server response.';
+                    console.error('Invalid chart data:', data);
+                    return;
+                }
 
-            const ctx = document.getElementById('trendsChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels,
-                    datasets: [
-                        {
-                            label: 'Income',
-                            data: data.income,
-                            borderColor: '#a8d8ea',
-                            backgroundColor: 'rgba(168, 216, 234, 0.2)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Expenses',
-                            data: data.expense,
-                            borderColor: '#f7c5cc',
-                            backgroundColor: 'rgba(247, 197, 204, 0.2)',
-                            fill: true,
-                            tension: 0.4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'top' }
+                ```chartjs
+                {
+                    type: "line",
+                    data: {
+                        labels: data.labels,
+                        datasets: [
+                            {
+                                label: "Income",
+                                data: data.income,
+                                borderColor: "#a8d8ea",
+                                backgroundColor: "rgba(168, 216, 234, 0.2)",
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: "Expenses",
+                                data: data.expense,
+                                borderColor: "#f7c5cc",
+                                backgroundColor: "rgba(247, 197, 204, 0.2)",
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
                     },
-                    scales: {
-                        y: { beginAtZero: true }
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: "top" }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
                     }
                 }
-            });
-        })
-        .catch(error => {
-            console.error('Chart Error:', error);
-        });
-});
+                ```
+
+            } catch (error) {
+                console.error('Chart load error:', error);
+                this.errorMessage = error.response?.data?.message || 'Failed to load chart data. Please try again later.';
+            }
+        }
+    }
+}).mount('#app');
 </script>
+<?php $this->load->view('footer'); ?>
