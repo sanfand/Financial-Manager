@@ -1,69 +1,79 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
-class Dashboard extends CI_Controller {
-    public function __construct() {
+class Dashboard extends CI_Controller
+{
+    public function __construct()
+    {
         parent::__construct();
         $this->load->model('Transaction_model');
         $this->load->library('session');
         $this->load->helper('url');
         if (!$this->session->userdata('logged_in')) {
-            redirect('auth/login');
+            $this->output->set_content_type('application/json');
+            echo json_encode(['status' => 'error', 'message' => 'User not authenticated']);
+            return;
         }
     }
 
-    public function index() {
+    public function index()
+    {
+        $this->output->set_content_type('application/json');
         $user_id = $this->session->userdata('user_id');
-        $summary = $this->Transaction_model->get_financial_summary($user_id);
-        $recent_transactions = $this->Transaction_model->get_recent_transactions($user_id, 6);
+        if (!$user_id) {
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+            return;
+        }
 
-        // Validate and cast summary values
-        $data = [
-            'title' => 'Financial Dashboard',
+        $this->load->model('Transaction_model');
+
+        // Calculate summary
+        $this->db->select('SUM(CASE WHEN type = "income" THEN amount ELSE 0 END) as income, SUM(CASE WHEN type = "expense" THEN amount ELSE 0 END) as expense');
+        $this->db->where('user_id', $user_id);
+        $summary = $this->db->get('transactions')->row();
+
+        $income = $summary ? (float) $summary->income : 0;
+        $expense = $summary ? (float) $summary->expense : 0;
+
+        // Get recent transactions
+        $this->db->select('t.*, c.name as category_name');
+        $this->db->from('transactions t');
+        $this->db->join('categories c', 'c.id = t.category_id', 'left');
+        $this->db->where('t.user_id', $user_id);
+        $this->db->order_by('t.occurred_at', 'DESC');
+        $this->db->limit(5);
+        $recent_transactions = $this->db->get()->result();
+
+        echo json_encode([
+            'status' => 'success',
             'summary' => [
-                'income' => isset($summary['income']) ? floatval($summary['income']) : 0.0,
-                'expense' => isset($summary['expense']) ? floatval($summary['expense']) : 0.0,
-                'balance' => isset($summary['balance']) ? floatval($summary['balance']) : 0.0
+                'income' => $income,
+                'expense' => $expense,
+                'balance' => $income - $expense
             ],
-            'recent_transactions' => is_array($recent_transactions) ? array_map(function($t) {
-                $t->amount = floatval($t->amount ?? 0);
-                return $t;
-            }, $recent_transactions) : []
+            'recent_transactions' => $recent_transactions
+        ]);
+    }
+
+    public function get_chart_data()
+    {
+        $this->output->set_content_type('application/json');
+        $user_id = $this->session->userdata('user_id');
+        $chart_data = $this->Transaction_model->get_chart_data($user_id);
+
+        $chart_data = [
+            'labels' => isset($chart_data['labels']) && is_array($chart_data['labels']) ? $chart_data['labels'] : [],
+            'income' => isset($chart_data['income']) && is_array($chart_data['income']) ? array_map('floatval', $chart_data['income']) : [],
+            'expense' => isset($chart_data['expense']) && is_array($chart_data['expense']) ? array_map('floatval', $chart_data['expense']) : []
         ];
 
-        // Log data for debugging
-        log_message('debug', 'Dashboard index - Summary: ' . json_encode($data['summary']));
-        log_message('debug', 'Dashboard index - Recent Transactions: ' . json_encode($data['recent_transactions']));
+        $count = max(count($chart_data['labels']), count($chart_data['income']), count($chart_data['expense']));
+        $chart_data['labels'] = array_pad($chart_data['labels'], $count, '');
+        $chart_data['income'] = array_pad($chart_data['income'], $count, 0.0);
+        $chart_data['expense'] = array_pad($chart_data['expense'], $count, 0.0);
 
-        $this->load->view('dashboard', $data);
-    }
+        log_message('debug', 'Chart data: ' . json_encode($chart_data));
 
-    public function get_chart_data() {
-        if ($this->input->is_ajax_request()) {
-            $user_id = $this->session->userdata('user_id');
-            $chart_data = $this->Transaction_model->get_chart_data($user_id);
-
-            // Validate and cast chart data
-            $chart_data = [
-                'labels' => isset($chart_data['labels']) && is_array($chart_data['labels']) ? $chart_data['labels'] : [],
-                'income' => isset($chart_data['income']) && is_array($chart_data['income']) ? array_map('floatval', $chart_data['income']) : [],
-                'expense' => isset($chart_data['expense']) && is_array($chart_data['expense']) ? array_map('floatval', $chart_data['expense']) : []
-            ];
-
-            // Ensure arrays have consistent lengths
-            $count = max(count($chart_data['labels']), count($chart_data['income']), count($chart_data['expense']));
-            $chart_data['labels'] = array_pad($chart_data['labels'], $count, '');
-            $chart_data['income'] = array_pad($chart_data['income'], $count, 0.0);
-            $chart_data['expense'] = array_pad($chart_data['expense'], $count, 0.0);
-
-            // Log chart data for debugging
-            log_message('debug', 'Chart data: ' . json_encode($chart_data));
-
-            $this->output
-                ->set_content_type('application/json')
-                ->set_output(json_encode($chart_data));
-        } else {
-            show_404();
-        }
+        echo json_encode(['status' => 'success', 'data' => $chart_data]);
     }
 }
