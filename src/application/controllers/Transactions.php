@@ -3,179 +3,184 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Transactions extends CI_Controller
 {
+    private $user_id;
+
     public function __construct()
     {
         parent::__construct();
         $this->load->model('Transaction_model');
         $this->load->model('Category_model');
-        $this->load->library('session');
+        $this->load->model('Token_model');
+        $this->load->library("Auth");
 
-        if (!$this->session->userdata('logged_in')) {
-            $this->output->set_content_type('application/json');
-            echo json_encode(['status' => 'error', 'message' => 'User not authenticated']);
-            return;
+        header('Access-Control-Allow-Origin: http://localhost:5173');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit;
         }
+
+        $this->authenticate();
+    }
+
+    private function authenticate()
+    {
+        // $headers = getallheaders();
+        // $auth_header = $headers['Authorization'] ?? $headers['Authorization'] ?? '';
+
+        // echo "auth:";
+        // print_r($auth_header);
+        // return;
+        // log_message('debug', 'Transactions authenticate - Headers: ' . json_encode($headers));
+        // log_message('debug', 'Transactions authenticate - Authorization header: ' . $auth_header);
+
+        // if (!preg_match('/Bearer\s+(\S+)/', $auth_header, $matches)) {
+        //     log_message('error', 'Transactions authenticate - No valid Bearer token found');
+        //     $this->output->set_content_type('application/json')->set_status_header(401);
+        //     echo json_encode(['status' => 'error', 'message' => 'Token required']);
+        //     exit;
+        // }
+
+        // $token = $matches[1];
+        // log_message('debug', 'Transactions authenticate - Token extracted: ' . $token);
+        // $this->user_id = $this->Token_model->verify($token);
+
+        // if (!$this->user_id) {
+        //     log_message('error', 'Transactions authenticate - Token verification failed for token: ' . $token);
+        //     $this->output->set_content_type('application/json')->set_status_header(401);
+        //     echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
+        //     exit;
+        // }
+        // log_message('debug', 'Transactions authenticate - Token verified, user_id: ' . $this->user_id);
+
+        $auth = new Auth();
+
+        $userId = $auth->authenticate();
+
+        if(!$userId){
+            echo 'token or user is not valid';
+            exit;
+        }
+
+        $this->user_id = $userId;
     }
 
     public function index()
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
+
         $page = max(1, (int) $this->input->get('page', TRUE));
         $per_page = max(1, (int) $this->input->get('per_page', TRUE));
 
-        $total_rows = $this->Transaction_model->count_transactions($user_id);
-        $transactions = $this->Transaction_model->get_transactions($user_id, $per_page, ($page - 1) * $per_page);
-        $categories = $this->Category_model->get_categories();
+        try {
+            $total_rows = $this->Transaction_model->count_transactions($this->user_id);
+            $transactions = $this->Transaction_model->get_transactions($this->user_id, $per_page, ($page - 1) * $per_page);
+            $categories = $this->Category_model->get_user_categories($this->user_id);
 
-        $response = [
-            'status' => 'success',
-            'transactions' => is_array($transactions) ? array_map(function ($t) {
-                $t->amount = floatval($t->amount ?? 0);
-                return $t;
-            }, $transactions) : [],
-            'categories' => is_array($categories) ? $categories : [],
-            'current_page' => $page,
-            'total_pages' => ceil($total_rows / $per_page) ?: 1
-        ];
+            $response = [
+                'status' => 'success',
+                'transactions' => $transactions,
+                'categories' => $categories,
+                'current_page' => $page,
+                'total_pages' => ceil($total_rows / $per_page) ?: 1,
+                'total_records' => $total_rows
+            ];
 
-        echo json_encode($response);
+            echo json_encode($response);
+        } catch (Exception $e) {
+            log_message('error', 'Transactions index error: ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'Error loading transactions']);
+        }
     }
 
     public function create()
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
-        if (!$user_id) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
-            return;
-        }
 
-        // Handle JSON or POST input
         $raw_input = file_get_contents('php://input');
-        $post_data = json_decode($raw_input, true) ?: $this->input->post();
+        $post_data = json_decode($raw_input, true) ?: [];
 
         $data = [
-            'user_id' => $user_id,
             'title' => isset($post_data['title']) ? trim($post_data['title']) : '',
             'amount' => isset($post_data['amount']) ? (float) $post_data['amount'] : 0,
             'type' => isset($post_data['type']) ? $post_data['type'] : '',
-            'category_id' => isset($post_data['category_id']) ? (int) $post_data['category_id'] : null,
-            'occurred_at' => isset($post_data['occurred_at']) ? $post_data['occurred_at'] : '',
-            'notes' => isset($post_data['notes']) ? trim($post_data['notes']) : ''
+            'category_id' => isset($post_data['category_id']) && !empty($post_data['category_id']) ? (int) $post_data['category_id'] : null,
+            'occurred_at' => isset($post_data['occurred_at']) ? $post_data['occurred_at'] : date('Y-m-d H:i:s'),
+            'notes' => isset($post_data['notes']) ? trim($post_data['notes']) : '',
+            'user_id' => $this->user_id,
+            'created_at' => date('Y-m-d H:i:s')
         ];
 
-        // Validation
-        if (empty($data['title']) || $data['amount'] <= 0 || !in_array($data['type'], ['income', 'expense']) || empty($data['occurred_at'])) {
-            echo json_encode(['status' => 'error', 'message' => 'Title, valid amount, type (income/expense), and date are required']);
+        if (empty($data['title']) || empty($data['type']) || $data['amount'] <= 0) {
+            echo json_encode(['status' => 'error', 'message' => 'Title, type, and valid amount are required']);
             return;
         }
 
-        // Ensure Transaction_model is loaded
-        $this->load->model('Transaction_model');
-        $created = $this->Transaction_model->create($data);
+        if (!in_array($data['type'], ['income', 'expense'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Type must be income or expense']);
+            return;
+        }
 
-        if ($created) {
-            echo json_encode(['status' => 'success', 'message' => 'Transaction created']);
-        } else {
-            log_message('error', 'Transaction create failed: ' . json_encode($data));
-            echo json_encode(['status' => 'error', 'message' => 'Create failed']);
+        try {
+            if ($this->Transaction_model->create_transaction($data)) {
+                echo json_encode(['status' => 'success', 'message' => 'Transaction created successfully']);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Failed to create transaction']);
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Create transaction error: ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'Error creating transaction']);
         }
     }
 
-    public function edit($id = null)
+    public function delete($id = null)
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
-        if (!$user_id) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
-            return;
-        }
 
         if (!$id) {
             echo json_encode(['status' => 'error', 'message' => 'Transaction ID required']);
             return;
         }
 
-        // Handle JSON or POST input
-        $raw_input = file_get_contents('php://input');
-        $post_data = json_decode($raw_input, true) ?: $this->input->post();
-
-        $data = [
-            'title' => isset($post_data['title']) ? trim($post_data['title']) : '',
-            'amount' => isset($post_data['amount']) ? (float) $post_data['amount'] : 0,
-            'type' => isset($post_data['type']) ? $post_data['type'] : '',
-            'category_id' => isset($post_data['category_id']) ? ($post_data['category_id'] === null ? null : (int) $post_data['category_id']) : null,
-            'occurred_at' => isset($post_data['occurred_at']) ? $post_data['occurred_at'] : '',
-            'notes' => isset($post_data['notes']) ? trim($post_data['notes']) : ''
-        ];
-
-        // Validation
-        if (empty($data['title']) || $data['amount'] <= 0 || !in_array($data['type'], ['income', 'expense']) || empty($data['occurred_at'])) {
-            echo json_encode(['status' => 'error', 'message' => 'Title, valid amount, type (income/expense), and date are required']);
-            return;
-        }
-
-        // Verify transaction exists and belongs to user
-        $this->load->model('Transaction_model');
-        $transaction = $this->Transaction_model->get_transaction($id);
-        if (!$transaction || $transaction->user_id != $user_id) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized or transaction not found']);
-            return;
-        }
-
-        // Update transaction
         try {
-            $updated = $this->Transaction_model->update_transaction($id, $data);
-            if ($updated) {
-                echo json_encode(['status' => 'success', 'message' => 'Transaction updated']);
+            $this->db->where('id', $id);
+            $this->db->where('user_id', $this->user_id);
+            $query = $this->db->get('transactions');
+
+            if ($query->num_rows() === 0) {
+                echo json_encode(['status' => 'error', 'message' => 'Transaction not found']);
+                return;
+            }
+
+            $this->db->where('id', $id);
+            $this->db->where('user_id', $this->user_id);
+            $deleted = $this->db->delete('transactions');
+
+            if ($deleted) {
+                echo json_encode(['status' => 'success', 'message' => 'Transaction deleted successfully']);
             } else {
-                log_message('error', 'Transaction update failed: ID=' . $id . ', Data=' . json_encode($data));
-                echo json_encode(['status' => 'error', 'message' => 'Update failed']);
+                echo json_encode(['status' => 'error', 'message' => 'Failed to delete transaction']);
             }
         } catch (Exception $e) {
-            log_message('error', 'Transaction edit error: ' . $e->getMessage());
-            echo json_encode(['status' => 'error', 'message' => 'Server error: ' . $e->getMessage()]);
-        }
-    }
-
-
-    public function delete($id = null)
-    {
-        $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
-
-        if (empty($id)) {
-            echo json_encode(['status' => 'error', 'message' => 'Transaction ID required']);
-            return;
-        }
-
-        $transaction = $this->Transaction_model->get_transaction($id);
-        if (!$transaction || $transaction->user_id != $user_id) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized or transaction not found']);
-            return;
-        }
-
-        if ($this->Transaction_model->delete_transaction($id)) {
-            echo json_encode(['status' => 'success', 'message' => 'Transaction deleted']);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'Delete failed']);
+            log_message('error', 'Delete transaction error: ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'Error deleting transaction']);
         }
     }
 
     public function search()
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
 
-        // Handle JSON or POST input
         $raw_input = file_get_contents('php://input');
-        $post_data = json_decode($raw_input, true) ?: $this->input->post();
+        $post_data = json_decode($raw_input, true) ?: [];
 
         $filters = [
             'search' => isset($post_data['search']) ? trim($post_data['search']) : '',
             'type' => isset($post_data['type']) ? $post_data['type'] : '',
-            'category_id' => isset($post_data['category_id']) ? ($post_data['category_id'] ? (int) $post_data['category_id'] : '') : '',
+            'category_id' => isset($post_data['category_id']) && !empty($post_data['category_id']) ? (int) $post_data['category_id'] : '',
             'start_date' => isset($post_data['start_date']) ? $post_data['start_date'] : '',
             'end_date' => isset($post_data['end_date']) ? $post_data['end_date'] : '',
             'page' => max(1, (int) ($post_data['page'] ?? 1)),
@@ -183,15 +188,17 @@ class Transactions extends CI_Controller
         ];
 
         try {
-            $total_rows = $this->Transaction_model->count_transactions($user_id, $filters);
-            $transactions = $this->Transaction_model->search_transactions($user_id, $filters, $filters['per_page'], ($filters['page'] - 1) * $filters['per_page']);
+            $total_rows = $this->Transaction_model->count_transactions($this->user_id, $filters);
+            $transactions = $this->Transaction_model->search_transactions($this->user_id, $filters, $filters['per_page'], ($filters['page'] - 1) * $filters['per_page']);
 
             $response = [
                 'status' => 'success',
-                'transactions' => is_array($transactions) ? $transactions : [],
+                'transactions' => $transactions,
                 'current_page' => $filters['page'],
-                'total_pages' => ceil($total_rows / $filters['per_page']) ?: 1
+                'total_pages' => ceil($total_rows / $filters['per_page']) ?: 1,
+                'total_records' => $total_rows
             ];
+
             echo json_encode($response);
         } catch (Exception $e) {
             log_message('error', 'Search transactions error: ' . $e->getMessage());

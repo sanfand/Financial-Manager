@@ -2,7 +2,7 @@
   <div class="container-fluid py-5">
     <h1 class="h2 mb-4 text-gray-800">{{ title }}</h1>
 
-    <!-- Profile Modal -->
+    <!-- Edit Profile Modal -->
     <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true" ref="profileModal">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -13,7 +13,7 @@
           <div class="modal-body">
             <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
             <div v-if="successMessage" class="alert alert-success">{{ successMessage }}</div>
-            <form @submit.prevent="updateProfile">
+            <form @submit.prevent="updateProfile" enctype="multipart/form-data">
               <div class="form-group mb-3">
                 <label for="profileName">Name</label>
                 <input type="text" v-model="user.name" class="form-control" id="profileName" required>
@@ -29,6 +29,7 @@
               <div class="form-group mb-3">
                 <label for="profilePic">Profile Picture</label>
                 <input type="file" class="form-control" id="profilePic" @change="handleFileChange" accept="image/*">
+                <small class="form-text text-muted">Max size: 2MB. Allowed types: JPG, JPEG, PNG, GIF</small>
               </div>
               <button type="submit" class="btn btn-primary btn-sm">Update Profile</button>
             </form>
@@ -37,7 +38,6 @@
       </div>
     </div>
 
-    <!-- Profile Display -->
     <div class="card shadow mb-4">
       <div class="card-header py-3">
         <h6 class="m-0 fw-bold text-dark">Your Profile</h6>
@@ -45,7 +45,7 @@
       <div class="card-body">
         <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
         <div class="text-center">
-          <img :src="user.profile_pic || '/assets/default-avatar.png'" class="profile-pic rounded-circle" style="width:100px;height:100px;object-fit:cover;" alt="Profile Picture" @error="handleImageError">
+          <img :src="user.profile_pic || '/default-avatar.png'" class="profile-pic rounded-circle" style="width:100px;height:100px;" @error="handleImageError">
           <h5 class="mt-3">{{ user.name || 'N/A' }}</h5>
           <p>{{ user.email || 'N/A' }}</p>
           <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#profileModal">Edit Profile</button>
@@ -56,53 +56,45 @@
 </template>
 
 <script>
-import axios from 'axios';
-import * as bootstrap from 'bootstrap';
+import axios from '../utils/auth';
+import { clearToken } from '../utils/auth';
+import bootstrap from 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
 export default {
   data() {
     return {
       title: 'Profile',
-      user: {
-        name: '',
-        email: '',
-        profile_pic: ''
-      },
+      user: {},
       profilePicFile: null,
       errorMessage: '',
       successMessage: ''
     };
   },
-  async mounted() {
-    await this.loadProfile();
+  mounted() {
+    this.loadProfile();
   },
   methods: {
     async loadProfile() {
+      this.errorMessage = '';
       try {
-        const response = await axios.get('/api/profile', {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          withCredentials: true
-        });
-        console.log('Load profile response:', response.data);
+        const response = await axios.get('/profile');
+        console.log('Profile data:', response.data);
         if (response.data.status === 'success') {
           this.user = response.data.user || {};
-          // Ensure profile_pic URL is fresh
-          if (this.user.profile_pic) {
-            this.user.profile_pic = this.user.profile_pic + '?t=' + new Date().getTime();
-          }
         } else {
           this.errorMessage = response.data.message || 'Failed to load profile';
         }
       } catch (e) {
-        console.error('Load profile error:', e);
+        console.error('Load profile error:', e.response || e.message);
         this.errorMessage = e.response?.data?.message || 'Error loading profile';
+        if (e.response?.status === 401 || e.response?.status === 403) clearToken();
       }
     },
     handleFileChange(event) {
       this.profilePicFile = event.target.files[0] || null;
     },
-    handleImageError() {
-      this.user.profile_pic = '/assets/default-avatar.png';
+    handleImageError(event) {
+      event.target.src = '/default-avatar.png';
     },
     async updateProfile() {
       this.errorMessage = '';
@@ -118,25 +110,27 @@ export default {
           formData.append('profile_pic', this.profilePicFile);
         }
 
-        const response = await axios.post('/api/profile/update_profile', formData, {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          withCredentials: true
+        const response = await axios.post('/profile/update_profile', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
+        
         console.log('Update profile response:', response.data);
 
         if (response.data.status === 'success') {
           this.user = response.data.user || {};
-          // Prevent cache for profile picture
+          // Add timestamp to force image reload
           if (this.user.profile_pic) {
             this.user.profile_pic = this.user.profile_pic + '?t=' + new Date().getTime();
           }
           this.profilePicFile = null;
-          this.successMessage = 'Profile updated successfully';
-          const modal = this.$refs.profileModal;
+          this.successMessage = response.data.message || 'Profile updated successfully';
+          
+          // Close modal after success
+          const modal = bootstrap.Modal.getInstance(this.$refs.profileModal);
           if (modal) {
-            const bootstrapModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
-            bootstrapModal.hide();
+            modal.hide();
           }
+          
           setTimeout(() => {
             this.successMessage = '';
           }, 3000);
@@ -144,8 +138,9 @@ export default {
           this.errorMessage = response.data.message || 'Failed to update profile';
         }
       } catch (e) {
-        console.error('Update profile error:', e);
+        console.error('Update profile error:', e.response || e.message);
         this.errorMessage = e.response?.data?.message || 'Error updating profile';
+        if (e.response?.status === 401 || e.response?.status === 403) clearToken();
       }
     }
   }
@@ -163,5 +158,6 @@ export default {
 }
 .profile-pic {
   object-fit: cover;
+  border: 3px solid #a8d8ea;
 }
 </style>

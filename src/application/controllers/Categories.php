@@ -3,47 +3,79 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Categories extends CI_Controller
 {
+    private $user_id;
+
     public function __construct()
     {
         parent::__construct();
         $this->load->model('Category_model');
-        $this->load->library('session');
+        $this->load->model('Token_model');
         $this->load->helper('url');
-        if (!$this->session->userdata('logged_in')) {
-            $this->output->set_content_type('application/json');
-            echo json_encode(['status' => 'error', 'message' => 'User not authenticated']);
-            return;
+
+        header('Access-Control-Allow-Origin: http://localhost:5173');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit;
         }
+
+        $this->authenticate();
+    }
+
+    private function authenticate()
+    {
+        $headers = getallheaders();
+        $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        log_message('debug', 'Categories authenticate - Headers: ' . json_encode($headers));
+        log_message('debug', 'Categories authenticate - Authorization header: ' . $auth_header);
+
+        if (!preg_match('/Bearer\s+(\S+)/', $auth_header, $matches)) {
+            log_message('error', 'Categories authenticate - No valid Bearer token found');
+            $this->output->set_content_type('application/json')->set_status_header(401);
+            echo json_encode(['status' => 'error', 'message' => 'Token required']);
+            exit;
+        }
+
+        $token = $matches[1];
+        log_message('debug', 'Categories authenticate - Token extracted: ' . $token);
+        $this->user_id = $this->Token_model->verify($token);
+
+        if (!$this->user_id) {
+            log_message('error', 'Categories authenticate - Token verification failed for token: ' . $token);
+            $this->output->set_content_type('application/json')->set_status_header(401);
+            echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
+            exit;
+        }
+        log_message('debug', 'Categories authenticate - Token verified, user_id: ' . $this->user_id);
     }
 
     public function index()
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
+
         $page = max(1, (int) $this->input->get('page', TRUE));
         $per_page = max(1, (int) $this->input->get('per_page', TRUE));
 
-        $total_rows = $this->Category_model->count_categories($user_id);
-        $categories = $this->Category_model->get_categories($user_id, $per_page, ($page - 1) * $per_page);
+        try {
+            $filters = [
+                'page' => $page,
+                'per_page' => $per_page
+            ];
 
-        $response = [
-            'status' => 'success',
-            'categories' => is_array($categories) ? $categories : [],
-            'current_page' => $page,
-            'total_pages' => ceil($total_rows / $per_page) ?: 1
-        ];
-
-        echo json_encode($response);
+            $result = $this->Category_model->search_categories($this->user_id, $filters);
+            echo json_encode($result);
+        } catch (Exception $e) {
+            log_message('error', 'Categories index error: ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'Error loading categories']);
+        }
     }
 
     public function create()
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
-        if (!$user_id) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
-            return;
-        }
 
         $raw_input = file_get_contents('php://input');
         $post_data = json_decode($raw_input, true) ?: [];
@@ -51,73 +83,60 @@ class Categories extends CI_Controller
         $data = [
             'name' => isset($post_data['name']) ? trim($post_data['name']) : '',
             'type' => isset($post_data['type']) ? $post_data['type'] : 'income',
-            'user_id' => $user_id
+            'user_id' => $this->user_id,
+            'created_at' => date('Y-m-d H:i:s')
         ];
 
-        if (empty($data['name']) || !in_array($data['type'], ['income', 'expense'])) {
-            echo json_encode(['status' => 'error', 'message' => 'Name and valid type (income/expense) are required']);
+        if (empty($data['name'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Category name is required']);
             return;
         }
 
-        try {
-            $result = $this->Category_model->create_category($data); // Fix: Call create_category
-            echo json_encode($result);
-        } catch (Exception $e) {
-            log_message('error', 'Category create error: ' . $e->getMessage());
-            echo json_encode(['status' => 'error', 'message' => 'Server error']);
+        if (!in_array($data['type'], ['income', 'expense'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Type must be income or expense']);
+            return;
         }
+
+        $result = $this->Category_model->create_category($data);
+        echo json_encode($result);
     }
 
     public function edit($id = null)
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
+
+        if (!$id) {
+            echo json_encode(['status' => 'error', 'message' => 'Category ID required']);
+            return;
+        }
 
         $raw_input = file_get_contents('php://input');
         $post_data = json_decode($raw_input, true) ?: [];
 
         $data = [
-            'id' => $id ?: (isset($post_data['id']) ? $post_data['id'] : null),
+            'id' => $id,
             'name' => isset($post_data['name']) ? trim($post_data['name']) : '',
-            'type' => isset($post_data['type']) ? $post_data['type'] : 'income',
-            'user_id' => $user_id
+            'type' => isset($post_data['type']) ? $post_data['type'] : '',
+            'user_id' => $this->user_id
         ];
 
-        if (!$data['id'] || empty($data['name']) || !in_array($data['type'], ['income', 'expense'])) {
-            echo json_encode(['status' => 'error', 'message' => 'ID and valid name/type required']);
+        if (empty($data['name'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Category name is required']);
             return;
         }
 
-        try {
-            // Check if category exists
-            $this->db->where('id', $data['id']);
-            $this->db->where('user_id', $user_id);
-            $query = $this->db->get('categories');
-            if ($query->num_rows() === 0) {
-                echo json_encode(['status' => 'error', 'message' => 'Category not found']);
-                return;
-            }
-
-            $result = $this->Category_model->update_category($data);
-            // Treat 'no changes made' as success since the category exists and input is valid
-            if ($result['status'] === 'error' && $result['message'] === 'Category not found or no changes made') {
-                $category = $query->row();
-                if ($category->name === $data['name'] && $category->type === $data['type']) {
-                    echo json_encode(['status' => 'success', 'category' => $category]);
-                    return;
-                }
-            }
-            echo json_encode($result);
-        } catch (Exception $e) {
-            log_message('error', 'Category update error: ' . $e->getMessage());
-            echo json_encode(['status' => 'error', 'message' => 'Server error']);
+        if (!in_array($data['type'], ['income', 'expense'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Type must be income or expense']);
+            return;
         }
+
+        $result = $this->Category_model->update_category($data);
+        echo json_encode($result);
     }
 
     public function delete($id = null)
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
 
         if (!$id) {
             echo json_encode(['status' => 'error', 'message' => 'Category ID required']);
@@ -125,22 +144,22 @@ class Categories extends CI_Controller
         }
 
         try {
-            // Check if category exists
+            // Check if category exists and belongs to user
             $this->db->where('id', $id);
-            $this->db->where('user_id', $user_id);
+            $this->db->where('user_id', $this->user_id);
             $query = $this->db->get('categories');
+
             if ($query->num_rows() === 0) {
                 echo json_encode(['status' => 'error', 'message' => 'Category not found']);
                 return;
             }
 
-            // Check if category is used
-            if ($this->Category_model->is_category_used($id, $user_id)) {
-                echo json_encode(['status' => 'error', 'message' => 'Category in use']);
+            if ($this->Category_model->is_category_used($id, $this->user_id)) {
+                echo json_encode(['status' => 'error', 'message' => 'Cannot delete category: it is being used in transactions']);
                 return;
             }
 
-            $result = $this->Category_model->delete_category($id, $user_id);
+            $result = $this->Category_model->delete_category($id, $this->user_id);
             echo json_encode($result);
         } catch (Exception $e) {
             log_message('error', 'Delete category error: ' . $e->getMessage());
@@ -151,25 +170,36 @@ class Categories extends CI_Controller
     public function search()
     {
         $this->output->set_content_type('application/json');
-        $user_id = $this->session->userdata('user_id');
 
-        // Get raw input data for JSON
         $raw_input = file_get_contents('php://input');
-        $post_data = json_decode($raw_input, true) ?: $this->input->post();
+        $post_data = json_decode($raw_input, true) ?: [];
 
         $filters = [
             'search' => isset($post_data['search']) ? trim($post_data['search']) : '',
             'type' => isset($post_data['type']) ? $post_data['type'] : '',
-            'page' => max(1, (int) ($post_data['page'] ?? $this->input->post('page', TRUE))),
-            'per_page' => max(1, (int) ($post_data['per_page'] ?? $this->input->post('per_page', TRUE)))
+            'page' => max(1, (int) ($post_data['page'] ?? 1)),
+            'per_page' => max(1, (int) ($post_data['per_page'] ?? 10))
         ];
 
         try {
-            $result = $this->Category_model->search_categories($user_id, $filters);
+            $result = $this->Category_model->search_categories($this->user_id, $filters);
             echo json_encode($result);
         } catch (Exception $e) {
             log_message('error', 'Search categories error: ' . $e->getMessage());
             echo json_encode(['status' => 'error', 'message' => 'Error searching categories']);
+        }
+    }
+
+    public function get_categories_list()
+    {
+        $this->output->set_content_type('application/json');
+
+        try {
+            $categories = $this->Category_model->get_user_categories($this->user_id);
+            echo json_encode(['status' => 'success', 'categories' => $categories]);
+        } catch (Exception $e) {
+            log_message('error', 'Get categories list error: ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'Error loading categories']);
         }
     }
 }

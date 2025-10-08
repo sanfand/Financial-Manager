@@ -1,10 +1,24 @@
 <?php
 class Category_model extends CI_Model
 {
-    public function get_categories()
+    protected $table = 'categories';
+
+    public function get_categories($user_id = null)
     {
+        if ($user_id) {
+            $this->db->where('user_id', $user_id);
+        }
         $query = $this->db->get('categories');
         return $query->result();
+    }
+
+    public function count_categories($user_id = null)
+    {
+        if ($user_id) {
+            $this->db->where('user_id', $user_id);
+        }
+        $this->db->from($this->table);
+        return $this->db->count_all_results();
     }
 
     public function create_category($data)
@@ -54,6 +68,8 @@ class Category_model extends CI_Model
 
     public function search_categories($user_id, $filters)
     {
+        $this->db->where('user_id', $user_id);
+
         if (!empty($filters['search'])) {
             $this->db->like('name', $filters['search']);
         }
@@ -80,14 +96,23 @@ class Category_model extends CI_Model
             'status' => 'success',
             'categories' => $categories,
             'current_page' => $page,
-            'total_pages' => $total_pages
+            'total_pages' => $total_pages,
+            'total_records' => $total_records
         ];
     }
 
     public function is_category_used($id, $user_id)
     {
         $this->db->where('category_id', $id);
+        $this->db->where('user_id', $user_id);
         $this->db->from('transactions');
         return $this->db->count_all_results() > 0;
+    }
+
+    public function get_user_categories($user_id)
+    {
+        $this->db->where('user_id', $user_id);
+        $query = $this->db->get('categories');
+        return $query->result();
     }
 }

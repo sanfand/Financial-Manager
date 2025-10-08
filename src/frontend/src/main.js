@@ -2,13 +2,9 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
-import axios from 'axios';
-import 'bootstrap/dist/css/bootstrap.min.css'; // Bootstrap CSS
-import 'bootstrap'; // Bootstrap JS
-
-
-
-
+import './utils/auth'; // Import to init interceptors (no named import needed)
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap';
 
 const app = createApp(App);
 app.use(createPinia());

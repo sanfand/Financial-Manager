@@ -43,7 +43,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import axios from '../utils/auth';
 
 export default {
   data() {
@@ -61,7 +61,19 @@ export default {
       this.errorMessage = '';
       this.isLoading = true;
 
-      // Debug: Log form data before sending
+      // Validation
+      if (this.password !== this.passwordConfirm) {
+        this.errorMessage = 'Passwords do not match';
+        this.isLoading = false;
+        return;
+      }
+
+      if (this.password.length < 6) {
+        this.errorMessage = 'Password must be at least 6 characters';
+        this.isLoading = false;
+        return;
+      }
+
       console.log('Form data being sent:', {
         name: this.name,
         email: this.email,
@@ -70,21 +82,18 @@ export default {
       });
 
       try {
-        // Use FormData to send as application/x-www-form-urlencoded
-        const formData = new FormData();
-        formData.append('name', this.name);
-        formData.append('email', this.email);
-        formData.append('password', this.password);
-        formData.append('password_confirm', this.passwordConfirm);
-
-        const response = await axios.post('/api/auth/register', formData, {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
+        const response = await axios.post('/auth/register', {
+          name: this.name,
+          email: this.email,
+          password: this.password,
+          password_confirm: this.passwordConfirm
+        }, {
+          headers: { 
+            'Content-Type': 'application/json'
           }
         });
 
-        console.log('Response received:', response); // Debug: Log full response
+        console.log('Response received:', response);
 
         if (response.data.status === 'success') {
           this.$router.push('/login');
@@ -93,7 +102,7 @@ export default {
           setTimeout(() => { this.errorMessage = ''; }, 5000);
         }
       } catch (e) {
-        console.error('Registration error details:', e.response || e.message); // Debug: Log full error
+        console.error('Registration error details:', e.response || e.message);
         this.errorMessage = e.response?.data?.message || 'Server error or unexpected response. Please try again.';
         setTimeout(() => { this.errorMessage = ''; }, 5000);
       } finally {

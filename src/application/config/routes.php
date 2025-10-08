@@ -55,34 +55,31 @@ $route['translate_uri_dashes'] = FALSE;
 
 
 // Auth Routes
-$route['api/auth/login']['POST'] = 'auth/login';
-$route['api/auth/register']['POST'] = 'auth/register';
-$route['api/auth/check']['GET'] = 'auth/check';
-$route['api/auth/logout']['POST'] = 'auth/logout';
+$route['auth/login']['POST'] = 'auth/login';
+$route['auth/register']['POST'] = 'auth/register';
+$route['auth/check']['GET'] = 'auth/check';
+$route['auth/logout']['POST'] = 'auth/logout';
 
 // Profile Routes
-$route['api/profile']['GET'] = 'profile/index';
-$route['api/profile/update_profile']['POST'] = 'profile/update_profile';
+$route['profile']['GET'] = 'profile/index';
+$route['profile/update_profile']['POST'] = 'profile/update_profile';
 
 // Transactions Routes
-$route['api/transactions']['GET'] = 'transactions/index';
-$route['api/transactions/create']['POST'] = 'transactions/create';
-$route['api/transactions/edit/(:any)']['PUT'] = 'transactions/edit/$1';
-$route['api/transactions/delete/(:any)']['DELETE'] = 'transactions/delete/$1';
-$route['api/transactions/search']['POST'] = 'transactions/search';
+$route['transactions']['GET'] = 'transactions/index';
+$route['transactions/create']['POST'] = 'transactions/create';
+$route['transactions/edit/(:any)']['POST'] = 'transactions/edit/$1'; // Changed to POST to match frontend
+$route['transactions/delete/(:any)']['DELETE'] = 'transactions/delete/$1';
+$route['transactions/search']['POST'] = 'transactions/search';
 
 // Dashboard Routes
-$route['api/dashboard']['GET'] = 'dashboard/index';
-$route['api/dashboard/get_chart_data']['GET'] = 'dashboard/get_chart_data';
+$route['dashboard']['GET'] = 'dashboard/index';
+$route['dashboard/get_chart_data']['GET'] = 'dashboard/get_chart_data';
 
 // Categories Routes
-$route['api/categories']['GET'] = 'categories/index';
-$route['api/categories/create']['POST'] = 'categories/create';
-$route['api/categories/edit/(:any)']['PUT'] = 'categories/edit/$1';
-$route['api/categories/delete/(:any)']['DELETE'] = 'categories/delete/$1';
-$route['api/categories/search']['POST'] = 'categories/search';
+$route['categories']['GET'] = 'categories/index';
+$route['categories/create']['POST'] = 'categories/create';
+$route['categories/edit/(:any)']['POST'] = 'categories/edit/$1'; // Changed to POST to match frontend
+$route['categories/delete/(:any)']['DELETE'] = 'categories/delete/$1';
+$route['categories/search']['POST'] = 'categories/search';
 
-$route['default_controller'] = 'welcome';
-$route['404_override'] = '';
-$route['translate_uri_dashes'] = FALSE;
 

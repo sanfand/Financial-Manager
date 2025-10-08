@@ -61,291 +61,249 @@
       </div>
     </div>
 
-    <!-- Search -->
-    <div class="card shadow mb-4">
-      <div class="card-header py-3">
-        <h6 class="m-0 fw-bold text-dark">Search Categories</h6>
-      </div>
-      <div class="card-body">
-        <div class="row g-2 mb-3">
-          <div class="col-md-4">
-            <input type="text" v-model="searchQuery" class="form-control" placeholder="Search name">
-          </div>
-          <div class="col-md-4">
-            <select v-model="searchType" class="form-control">
-              <option value="">All Types</option>
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <button class="btn btn-primary btn-sm me-2" @click="searchCategories(1)">Search</button>
-            <button class="btn btn-secondary btn-sm" @click="resetSearch">Reset</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Categories Table -->
     <div class="card shadow mb-4">
       <div class="card-header py-3 d-flex justify-content-between align-items-center">
-        <h6 class="m-0 fw-bold text-dark">Categories</h6>
-        <button class="btn btn-primary btn-sm" @click="openAddModal">Add Category</button>
+        <h6 class="m-0 font-weight-bold text-dark">Categories</h6>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addCategoryModal">Add Category</button>
       </div>
       <div class="card-body">
-        <div v-if="errorMessage" class="alert alert-danger mb-3">{{ errorMessage }}</div>
-        <table class="table table-bordered table-striped">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="category in categories" :key="category.id">
-              <td>{{ category.name || 'N/A' }}</td>
-              <td>{{ capitalize(category.type) }}</td>
-              <td>
-                <button class="btn btn-warning btn-sm me-1" @click="openEditModal(category)">Edit</button>
-                <button class="btn btn-danger btn-sm" @click="deleteCategory(category.id)">Delete</button>
-              </td>
-            </tr>
-            <tr v-if="categories.length === 0">
-              <td colspan="3" class="text-center">{{ noCategoriesMessage }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <!-- Pagination -->
-        <nav v-if="totalPages > 1">
-          <ul class="pagination justify-content-center">
-            <li class="page-item" :class="{ disabled: currentPage === 1 }">
-              <a class="page-link" href="#" @click.prevent="loadPage(currentPage - 1)">&lt;</a>
-            </li>
-            <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: page === currentPage }">
-              <a class="page-link" href="#" @click.prevent="loadPage(page)">{{ page }}</a>
-            </li>
-            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-              <a class="page-link" href="#" @click.prevent="loadPage(currentPage + 1)">&gt;</a>
-            </li>
-          </ul>
-        </nav>
+        <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+        <div class="mb-3">
+          <form @submit.prevent="searchCategories">
+            <div class="row">
+              <div class="col-md-4">
+                <input type="text" v-model="searchQuery" class="form-control" placeholder="Search by name">
+              </div>
+              <div class="col-md-4">
+                <select v-model="searchType" class="form-control">
+                  <option value="">All Types</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <button type="button" class="btn btn-secondary btn-sm" @click="resetSearch">Reset</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div v-if="loading" class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </div>
+
+        <div v-else>
+          <div class="table-responsive">
+            <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="category in categories" :key="category.id">
+                  <td>{{ category.name }}</td>
+                  <td>
+                    <span :class="['badge', category.type === 'income' ? 'bg-success' : 'bg-danger']">
+                      {{ category.type }}
+                    </span>
+                  </td>
+                  <td>
+                    <button class="btn btn-warning btn-sm" @click="openEditModal(category)" data-bs-toggle="modal" data-bs-target="#editCategoryModal">Edit</button>
+                    <button class="btn btn-danger btn-sm" @click="deleteCategory(category.id)">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>
+              Showing page {{ currentPage }} of {{ totalPages }}
+            </div>
+            <nav>
+              <ul class="pagination">
+                <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                  <button class="page-link" @click="changePage(currentPage - 1)">Previous</button>
+                </li>
+                <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: page === currentPage }">
+                  <button class="page-link" @click="changePage(page)">{{ page }}</button>
+                </li>
+                <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                  <button class="page-link" @click="changePage(currentPage + 1)">Next</button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from 'axios';
-import * as bootstrap from 'bootstrap';
+import axios from '../utils/auth';
+import { Modal } from 'bootstrap'
 
 export default {
+  name: 'Categories',
   data() {
     return {
       title: 'Categories',
       categories: [],
-      newCategory: { name: '', type: 'income' },
-      selectedCategory: { id: '', name: '', type: 'income' },
+      loading: false,
+      errorMessage: '',
+      newCategory: {
+        name: '',
+        type: 'income'
+      },
+      selectedCategory: {
+        id: '',
+        name: '',
+        type: 'income'
+      },
       searchQuery: '',
       searchType: '',
-      errorMessage: '',
-      noCategoriesMessage: 'No categories found. Try adding a new category or adjusting your search.',
       currentPage: 1,
       totalPages: 1,
-      perPage: 6
-    };
+      perPage: 10
+    }
   },
-  async mounted() {
-    await this.searchCategories(1);
+  mounted() {
+    this.loadCategories()
   },
   methods: {
-    capitalize(str) {
-      return str ? str.charAt(0).toUpperCase() + str.slice(1) : 'N/A';
-    },
-    openAddModal() {
-      this.errorMessage = '';
-      this.newCategory = { name: '', type: 'income' };
+    async loadCategories() {
+      this.loading = true
+      this.errorMessage = ''
+      
       try {
-        const modal = new bootstrap.Modal(this.$refs.addModal);
-        modal.show();
-      } catch (e) {
-        console.error('Error opening add modal:', e);
-        this.errorMessage = 'Failed to open add modal';
-      }
-    },
-    closeAddModal() {
-      try {
-        const modal = bootstrap.Modal.getInstance(this.$refs.addModal) || new bootstrap.Modal(this.$refs.addModal);
-        modal.hide();
-        this.errorMessage = '';
-      } catch (e) {
-        console.error('Error closing add modal:', e);
-        this.errorMessage = 'Failed to close add modal';
-      }
-    },
-    openEditModal(category) {
-      this.errorMessage = '';
-      this.selectedCategory = { ...category };
-      try {
-        const modal = new bootstrap.Modal(this.$refs.editModal);
-        modal.show();
-      } catch (e) {
-        console.error('Error opening edit modal:', e);
-        this.errorMessage = 'Failed to open edit modal';
-      }
-    },
-    closeEditModal() {
-      try {
-        const modal = bootstrap.Modal.getInstance(this.$refs.editModal) || new bootstrap.Modal(this.$refs.editModal);
-        modal.hide();
-        this.errorMessage = '';
-      } catch (e) {
-        console.error('Error closing edit modal:', e);
-        this.errorMessage = 'Failed to close edit modal';
+        const response = await axios.get(`/categories?page=${this.currentPage}&per_page=${this.perPage}`)
+        
+        if (response.data.status === 'success') {
+          this.categories = response.data.categories
+          this.currentPage = response.data.current_page
+          this.totalPages = response.data.total_pages
+        } else {
+          this.errorMessage = response.data.message || 'Failed to load categories'
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        if (error.response?.status === 401) {
+          this.$router.push('/login')
+          return
+        }
+        this.errorMessage = 'Error loading categories'
+      } finally {
+        this.loading = false
       }
     },
     async addCategory() {
-    this.errorMessage = '';
-    try {
-        const response = await axios.post('/api/categories/create', {
-            name: this.newCategory.name?.trim() || '',
-            type: this.newCategory.type || 'income'
-        }, {
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            withCredentials: true
-        });
-        console.log('Add category response:', response.data);
+      this.errorMessage = ''
+      
+      try {
+        const response = await axios.post('/categories/create', this.newCategory)
+        
         if (response.data.status === 'success') {
-            this.newCategory = { name: '', type: 'income' };
-            this.closeAddModal();
-            await this.searchCategories(1);
+          this.newCategory = { name: '', type: 'income' }
+          const modal = Modal.getInstance(this.$refs.addModal)
+          modal.hide()
+          this.loadCategories()
         } else {
-            this.errorMessage = response.data.message || 'Failed to add category';
+          this.errorMessage = response.data.message || 'Failed to add category'
         }
-    } catch (e) {
-        console.error('Add category error:', e);
-        this.errorMessage = e.response?.data?.message || 'Error adding category';
-    }
+      } catch (error) {
+        console.error('Error adding category:', error)
+        this.errorMessage = 'Error adding category'
+      }
     },
-
-
+    openEditModal(category) {
+      this.selectedCategory = { ...category }
+    },
     async editCategory() {
-    this.errorMessage = '';
-    try {
-        if (!this.selectedCategory.id) {
-            this.errorMessage = 'No category selected';
-            return;
-        }
-        const response = await axios.put(`/api/categories/edit/${this.selectedCategory.id}`, {
-            name: this.selectedCategory.name?.trim() || '',
-            type: this.selectedCategory.type || 'income'
-        }, {
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            withCredentials: true
-        });
-        console.log('Edit category response:', response.data);
+      this.errorMessage = ''
+      
+      try {
+        const response = await axios.post(`/categories/edit/${this.selectedCategory.id}`, this.selectedCategory)
+        
         if (response.data.status === 'success') {
-            this.closeEditModal();
-            await this.searchCategories(this.currentPage);
+          const modal = Modal.getInstance(this.$refs.editModal)
+          modal.hide()
+          this.loadCategories()
         } else {
-            this.errorMessage = response.data.message || 'Failed to update category';
+          this.errorMessage = response.data.message || 'Failed to update category'
         }
-    } catch (e) {
-        console.error('Edit category error:', e);
-        this.errorMessage = e.response?.data?.message || 'Error editing category';
-    }
+      } catch (error) {
+        console.error('Error updating category:', error)
+        this.errorMessage = 'Error updating category'
+      }
     },
-
     async deleteCategory(id) {
-      this.errorMessage = '';
+      if (!confirm('Are you sure you want to delete this category?')) {
+        return
+      }
+
       try {
-        const response = await axios.delete(`/api/categories/delete/${id}`, {
-          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          withCredentials: true
-        });
-        console.log('Delete category response:', response.data);
+        const response = await axios.delete(`/categories/delete/${id}`)
+        
         if (response.data.status === 'success') {
-          const newPage = this.currentPage > this.totalPages && this.totalPages > 1 ? this.currentPage - 1 : this.currentPage;
-          await this.searchCategories(newPage || 1);
+          this.loadCategories()
         } else {
-          this.errorMessage = response.data.message || 'Failed to delete category';
+          alert(response.data.message || 'Failed to delete category')
         }
-      } catch (e) {
-        console.error('Delete category error:', e);
-        this.errorMessage = e.response?.data?.message || 'Error deleting category';
+      } catch (error) {
+        console.error('Error deleting category:', error)
+        alert('Error deleting category')
       }
     },
-
-
-    async searchCategories(page = 1) {
-      this.errorMessage = '';
+    async searchCategories() {
+      this.loading = true
+      this.errorMessage = ''
+      
       try {
-        const response = await axios.post('/api/categories/search', {
-          search: this.searchQuery?.trim() || '',
-          type: this.searchType || '',
-          page,
+        const response = await axios.post('/categories/search', {
+          search: this.searchQuery,
+          type: this.searchType,
+          page: this.currentPage,
           per_page: this.perPage
-        }, {
-          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          withCredentials: true
-        });
-        console.log('Search response:', response.data);
+        })
+
         if (response.data.status === 'success') {
-          this.categories = Array.isArray(response.data.categories) ? response.data.categories : [];
-          this.currentPage = parseInt(response.data.current_page) || 1;
-          this.totalPages = parseInt(response.data.total_pages) || 1;
-          this.noCategoriesMessage = this.categories.length === 0
-            ? 'No categories found. Try adding a new category or adjusting your search.'
-            : '';
+          this.categories = response.data.categories
+          this.currentPage = response.data.current_page
+          this.totalPages = response.data.total_pages
         } else {
-          this.errorMessage = response.data.message || 'Search failed';
-          this.categories = [];
-          this.currentPage = 1;
-          this.totalPages = 1;
-          this.noCategoriesMessage = 'Search failed. Please try again.';
+          this.errorMessage = response.data.message || 'Search failed'
         }
-      } catch (e) {
-        console.error('Search categories error:', e);
-        this.errorMessage = e.response?.data?.message || 'Error searching categories';
-        this.categories = [];
-        this.currentPage = 1;
-        this.totalPages = 1;
-        this.noCategoriesMessage = 'Error loading categories. Please check your connection.';
+      } catch (error) {
+        console.error('Error searching categories:', error)
+        this.errorMessage = 'Error searching categories'
+      } finally {
+        this.loading = false
       }
     },
-    async loadPage(page) {
-      if (page < 1 || (this.totalPages > 1 && page > this.totalPages)) return;
-      await this.searchCategories(page);
+    resetSearch() {
+      this.searchQuery = ''
+      this.searchType = ''
+      this.currentPage = 1
+      this.loadCategories()
     },
-    async resetSearch() {
-      this.searchQuery = '';
-      this.searchType = '';
-      this.currentPage = 1;
-      this.errorMessage = '';
-      await this.searchCategories(1);
+    changePage(page) {
+      if (page >= 1 && page <= this.totalPages) {
+        this.currentPage = page
+        if (this.searchQuery || this.searchType) {
+          this.searchCategories()
+        } else {
+          this.loadCategories()
+        }
+      }
     }
   }
-};
+}
 </script>
-
-<style scoped>
-.card {
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-.modal-header {
-  background-color: #a8d8ea;
-  color: #fff;
-}
-.table {
-  width: 100%;
-  margin-bottom: 1rem;
-}
-.pagination .page-link {
-  color: #007bff;
-}
-.pagination .page-item.active .page-link {
-  background-color: #007bff;
-  border-color: #007bff;
-}
-</style>

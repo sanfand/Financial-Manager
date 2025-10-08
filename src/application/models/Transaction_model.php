@@ -5,6 +5,10 @@ class Transaction_model extends CI_Model {
 
     protected $table = 'transactions';
 
+    public function create_transaction($data) {
+        return $this->db->insert($this->table, $data);
+    }
+
     public function get_transactions($user_id, $limit = null, $offset = null, $filters = []) {
         $this->db->select('t.*, c.name as category_name');
         $this->db->from($this->table . ' t');
@@ -59,93 +63,10 @@ class Transaction_model extends CI_Model {
         if (!empty($filters['end_date'])) {
             $this->db->where('transactions.occurred_at <=', $filters['end_date']);
         }
-        $query = $this->db->get();
-        $result = $query->result();
+
+        $result = $this->db->get()->result_array();
         foreach ($result as &$row) {
-            $row->amount = (float) $row->amount;
-        }
-        return $result;
-
-    }
-
-   
-
-    public function get_transaction($id) {
-        $this->db->select('t.*, c.name as category_name');
-        $this->db->from($this->table . ' t');
-        $this->db->join('categories c', 'c.id = t.category_id', 'left');
-        $this->db->where('t.id', $id);
-        return $this->db->get()->row();
-    }
-
-    public function create($data) {
-        return $this->db->insert($this->table, $data);
-    }
-
-    public function update_transaction($id, $data) {
-        return $this->db->where('id', $id)->update($this->table, $data);
-    }
-
-    public function delete_transaction($id) {
-        return $this->db->where('id', $id)->delete($this->table);
-    }
-
-    public function count_transactions($user_id, $filters = []) {
-        $this->db->where('user_id', $user_id);
-        
-
-        if (!empty($filters['type'])) {
-            $this->db->where('type', $filters['type']);
-        }
-        if (!empty($filters['category_id'])) {
-            $this->db->where('category_id', $filters['category_id']);
-        }
-        if (!empty($filters['search'])) {
-            $this->db->like('title', $filters['search']);
-        }
-        if (!empty($filters['start_date'])) {
-            $this->db->where('occurred_at >=', $filters['start_date']);
-        }
-        if (!empty($filters['end_date'])) {
-            $this->db->where('occurred_at <=', $filters['end_date']);
-        }
-
-        return $this->db->count_all_results($this->table);
-    }
-
-
-    public function get_financial_summary($user_id) {
-        $summary = [
-            'income' => 0.0,
-            'expense' => 0.0,
-            'balance' => 0.0
-        ];
-        $this->db->select('type, SUM(amount) as total');
-        $this->db->where('user_id', $user_id);
-        $this->db->group_by('type');
-        $query = $this->db->get('transactions');
-        foreach ($query->result() as $row) {
-            if ($row->type === 'income') {
-                $summary['income'] = (float) $row->total;
-            } elseif ($row->type === 'expense') {
-                $summary['expense'] = (float) $row->total;
-            }
-        }
-        $summary['balance'] = $summary['income'] - $summary['expense'];
-        return $summary;
-    }
-
-    public function get_recent_transactions($user_id, $limit = 6) {
-        $this->db->select('transactions.*, categories.name as category_name');
-        $this->db->from('transactions');
-        $this->db->join('categories', 'transactions.category_id = categories.id', 'left');
-        $this->db->where('transactions.user_id', $user_id);
-        $this->db->order_by('transactions.occurred_at', 'DESC');
-        $this->db->limit($limit);
-        $query = $this->db->get();
-        $result = $query->result();
-        foreach ($result as &$row) {
-            $row->amount = (float) $row->amount;
+            $row['amount'] = (float) $row['amount'];
         }
         return $result;
     }
@@ -194,9 +115,6 @@ class Transaction_model extends CI_Model {
         ];
     }
 
-
-
-
     public function get_monthly_trends($user_id) {
         $this->db->select("DATE_FORMAT(occurred_at, '%Y-%m') as month, type, SUM(amount) as total");
         $this->db->where('user_id', $user_id);
@@ -205,15 +123,27 @@ class Transaction_model extends CI_Model {
         return $this->db->get($this->table)->result();
     }
 
-    
+    public function count_transactions($user_id, $filters = [])
+    {
+        $this->db->from($this->table);
+        $this->db->where('user_id', $user_id);
 
-    // // Check if category is used in any transaction
-    // public function is_category_used($category_id) {
-    //     $this->db->where('category_id', $category_id);
-    //     $query = $this->db->get('transactions'); 
-    //     return $query->num_rows() > 0;
-    // }
+        if (!empty($filters['type'])) {
+            $this->db->where('type', $filters['type']);
+        }
+        if (!empty($filters['category_id'])) {
+            $this->db->where('category_id', $filters['category_id']);
+        }
+        if (!empty($filters['search'])) {
+            $this->db->like('title', $filters['search']);
+        }
+        if (!empty($filters['start_date'])) {
+            $this->db->where('occurred_at >=', $filters['start_date']);
+        }
+        if (!empty($filters['end_date'])) {
+            $this->db->where('occurred_at <=', $filters['end_date']);
+        }
 
-    
-
+        return $this->db->count_all_results();
+    }
 }

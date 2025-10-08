@@ -23,50 +23,19 @@
 </template>
 
 <script>
-import axios from 'axios';
+import axios from '../utils/auth';
+import { getToken, logout as doLogout } from '../utils/auth';
 
 export default {
   data() {
     return {
-      isLoggedIn: false
+      isLoggedIn: !!getToken() // Set based on token presence
     };
   },
-  async created() {
-    await this.checkAuth();
-  },
-  watch: {
-    $route: {
-      handler: async function() {
-        await this.checkAuth();
-      },
-      immediate: true
-    }
-  },
   methods: {
-    async checkAuth() {
-      try {
-        const res = await axios.get('/api/auth/check', {
-          withCredentials: true  // Ensure cookies are sent
-        });
-        this.isLoggedIn = res.data.status === 'success' && res.data.is_logged_in;
-      } catch {
-        this.isLoggedIn = false;
-      }
-    },
     async logout() {
-      try {
-        const res = await axios.post('/api/auth/logout', {}, {
-          withCredentials: true
-        });
-        if (res.data.status === 'success') {
-          this.isLoggedIn = false;
-          this.$router.push('/login');
-        }
-      } catch (e) {
-        console.error('Logout error:', e);
-        this.isLoggedIn = false;
-        this.$router.push('/login');
-      }
+      await doLogout();
+      this.isLoggedIn = false;
     }
   }
 };
