@@ -26,6 +26,7 @@
 import axios from '../utils/auth';
 import { getToken, logout as doLogout } from '../utils/auth';
 
+
 export default {
   data() {
     return {

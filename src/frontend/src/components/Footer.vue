@@ -21,10 +21,22 @@ export default {
 
 <style scoped>
 .sticky-footer {
-  background-color: #f8f9fa; /* Adjust to match your CI3 footer.php styles */
+  background-color: #f8f9fa;
   padding: 1rem 0;
 }
 .links a {
   margin: 0 10px;
 }
+
+  html, body {
+    height: 100%;
+  }
+  #app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .main-content {
+    flex: 1;
+  }
 </style>

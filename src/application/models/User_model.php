@@ -10,7 +10,6 @@ class User_model extends CI_Model {
         return $this->db->insert('users', $data);
     }
 
-    // User_model.php
     public function get_by_email_or_name($login) {
         log_message('debug', 'Looking up user by: ' . $login);
         $this->db->where('email', $login);

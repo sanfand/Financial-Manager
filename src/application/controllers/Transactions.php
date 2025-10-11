@@ -28,44 +28,16 @@ class Transactions extends CI_Controller
 
     private function authenticate()
     {
-        // $headers = getallheaders();
-        // $auth_header = $headers['Authorization'] ?? $headers['Authorization'] ?? '';
+    $this->load->library('Auth');
+    $userId = $this->auth->authenticate();
 
-        // echo "auth:";
-        // print_r($auth_header);
-        // return;
-        // log_message('debug', 'Transactions authenticate - Headers: ' . json_encode($headers));
-        // log_message('debug', 'Transactions authenticate - Authorization header: ' . $auth_header);
+    if(!$userId){
+        $this->output->set_content_type('application/json')->set_status_header(401);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
+        exit;
+    }
 
-        // if (!preg_match('/Bearer\s+(\S+)/', $auth_header, $matches)) {
-        //     log_message('error', 'Transactions authenticate - No valid Bearer token found');
-        //     $this->output->set_content_type('application/json')->set_status_header(401);
-        //     echo json_encode(['status' => 'error', 'message' => 'Token required']);
-        //     exit;
-        // }
-
-        // $token = $matches[1];
-        // log_message('debug', 'Transactions authenticate - Token extracted: ' . $token);
-        // $this->user_id = $this->Token_model->verify($token);
-
-        // if (!$this->user_id) {
-        //     log_message('error', 'Transactions authenticate - Token verification failed for token: ' . $token);
-        //     $this->output->set_content_type('application/json')->set_status_header(401);
-        //     echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
-        //     exit;
-        // }
-        // log_message('debug', 'Transactions authenticate - Token verified, user_id: ' . $this->user_id);
-
-        $auth = new Auth();
-
-        $userId = $auth->authenticate();
-
-        if(!$userId){
-            echo 'token or user is not valid';
-            exit;
-        }
-
-        $this->user_id = $userId;
+    $this->user_id = $userId;
     }
 
     public function index()
@@ -203,6 +175,65 @@ class Transactions extends CI_Controller
         } catch (Exception $e) {
             log_message('error', 'Search transactions error: ' . $e->getMessage());
             echo json_encode(['status' => 'error', 'message' => 'Error searching transactions']);
+        }
+    }
+
+
+    public function update($id = null)
+    {
+    $this->output->set_content_type('application/json');
+
+        if (!$id) {
+            echo json_encode(['status' => 'error', 'message' => 'Transaction ID required']);
+            return;
+        }
+
+        $raw_input = file_get_contents('php://input');
+        $post_data = json_decode($raw_input, true) ?: [];
+
+        $data = [
+            'title' => isset($post_data['title']) ? trim($post_data['title']) : '',
+            'amount' => isset($post_data['amount']) ? (float) $post_data['amount'] : 0,
+            'type' => isset($post_data['type']) ? $post_data['type'] : '',
+            'category_id' => isset($post_data['category_id']) && !empty($post_data['category_id']) ? (int) $post_data['category_id'] : null,
+            'occurred_at' => isset($post_data['occurred_at']) ? $post_data['occurred_at'] : date('Y-m-d H:i:s'),
+            'notes' => isset($post_data['notes']) ? trim($post_data['notes']) : '',
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        if (empty($data['title']) || empty($data['type']) || $data['amount'] <= 0) {
+            echo json_encode(['status' => 'error', 'message' => 'Title, type, and valid amount are required']);
+            return;
+        }
+
+        if (!in_array($data['type'], ['income', 'expense'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Type must be income or expense']);
+            return;
+        }
+
+        try {
+            // Check if transaction exists and belongs to user
+            $this->db->where('id', $id);
+            $this->db->where('user_id', $this->user_id);
+            $query = $this->db->get('transactions');
+
+            if ($query->num_rows() === 0) {
+                echo json_encode(['status' => 'error', 'message' => 'Transaction not found']);
+                return;
+            }
+
+            $this->db->where('id', $id);
+            $this->db->where('user_id', $this->user_id);
+            $updated = $this->db->update('transactions', $data);
+
+            if ($updated) {
+                echo json_encode(['status' => 'success', 'message' => 'Transaction updated successfully']);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Failed to update transaction']);
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Update transaction error: ' . $e->getMessage());
+            echo json_encode(['status' => 'error', 'message' => 'Error updating transaction']);
         }
     }
 }

@@ -8,10 +8,10 @@ class Token_model extends CI_Model {
     }
 
     private function generate_token() {
-        return bin2hex(random_bytes(16)); //  32 bytes for tokens
+        return bin2hex(random_bytes(16)); //  
     }
 
-    // Token_model.php
+    // Create Token
     public function create($user_id) {
         log_message('debug', 'Create called with user_id: ' . $user_id);
         if (!$user_id || !is_numeric($user_id)) {

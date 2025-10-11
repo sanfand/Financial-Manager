@@ -81,9 +81,9 @@
                   <option value="expense">Expense</option>
                 </select>
               </div>
-              <div class="col-md-4">
-                <button type="submit" class="btn btn-primary btn-sm">Search</button>
-                <button type="button" class="btn btn-secondary btn-sm" @click="resetSearch">Reset</button>
+              <div class="col-md-1">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Search</button>
+                <button type="button" class="btn btn-secondary btn-sm w-100 mt-1" @click="resetSearch">Reset</button>
               </div>
             </div>
           </form>
@@ -114,7 +114,7 @@
                     </span>
                   </td>
                   <td>
-                    <button class="btn btn-warning btn-sm" @click="openEditModal(category)" data-bs-toggle="modal" data-bs-target="#editCategoryModal">Edit</button>
+                    <button class="btn btn-warning btn-sm me-2" @click="openEditModal(category)" data-bs-toggle="modal" data-bs-target="#editCategoryModal">Edit</button>
                     <button class="btn btn-danger btn-sm" @click="deleteCategory(category.id)">Delete</button>
                   </td>
                 </tr>
@@ -172,7 +172,7 @@ export default {
       searchType: '',
       currentPage: 1,
       totalPages: 1,
-      perPage: 10
+      perPage: 6
     }
   },
   mounted() {
@@ -307,3 +307,71 @@ export default {
   }
 }
 </script>
+<style scoped>
+
+
+.btn {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #5563a0, #7c59a0);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #56ab2f, #a8e6cf);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #d36b6b, #f89595);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #f5b7fc, #cc9199);
+}
+
+
+.badge {
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.bg-success {
+  background: linear-gradient(135deg, #5e8f48, #4a7e6b) !important;
+}
+
+.bg-danger {
+  background: linear-gradient(135deg, #642020, #693333) !important;
+}
+
+
+
+.pagination .page-link {
+  border-radius: 8px;
+  margin: 0 3px;
+  border: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.pagination .page-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+}
+
+.page-item.active .page-link {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+}
+</style>

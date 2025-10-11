@@ -11,6 +11,7 @@ class Categories extends CI_Controller
         $this->load->model('Category_model');
         $this->load->model('Token_model');
         $this->load->helper('url');
+        $this->load->library("Auth");
 
         header('Access-Control-Allow-Origin: http://localhost:5173');
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -25,31 +26,19 @@ class Categories extends CI_Controller
         $this->authenticate();
     }
 
+
     private function authenticate()
     {
-        $headers = getallheaders();
-        $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-        log_message('debug', 'Categories authenticate - Headers: ' . json_encode($headers));
-        log_message('debug', 'Categories authenticate - Authorization header: ' . $auth_header);
+    $this->load->library('Auth');
+    $userId = $this->auth->authenticate();
 
-        if (!preg_match('/Bearer\s+(\S+)/', $auth_header, $matches)) {
-            log_message('error', 'Categories authenticate - No valid Bearer token found');
-            $this->output->set_content_type('application/json')->set_status_header(401);
-            echo json_encode(['status' => 'error', 'message' => 'Token required']);
-            exit;
-        }
+    if(!$userId){
+        $this->output->set_content_type('application/json')->set_status_header(401);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
+        exit;
+    }
 
-        $token = $matches[1];
-        log_message('debug', 'Categories authenticate - Token extracted: ' . $token);
-        $this->user_id = $this->Token_model->verify($token);
-
-        if (!$this->user_id) {
-            log_message('error', 'Categories authenticate - Token verification failed for token: ' . $token);
-            $this->output->set_content_type('application/json')->set_status_header(401);
-            echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
-            exit;
-        }
-        log_message('debug', 'Categories authenticate - Token verified, user_id: ' . $this->user_id);
+    $this->user_id = $userId;
     }
 
     public function index()

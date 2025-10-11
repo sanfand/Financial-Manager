@@ -2,7 +2,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
-import './utils/auth'; // Import to init interceptors (no named import needed)
+import './utils/auth'; 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 

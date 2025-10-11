@@ -11,6 +11,7 @@ class Profile extends CI_Controller
         $this->load->model('User_model');
         $this->load->model('Token_model');
         $this->load->helper('url');
+        $this->load->library("Auth");
 
         header('Access-Control-Allow-Origin: http://localhost:5173');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -25,31 +26,19 @@ class Profile extends CI_Controller
         $this->authenticate();
     }
 
+
     private function authenticate()
     {
-        $headers = getallheaders();
-        $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-        log_message('debug', 'Profile authenticate - Headers: ' . json_encode($headers));
-        log_message('debug', 'Profile authenticate - Authorization header: ' . $auth_header);
+    $this->load->library('Auth');
+    $userId = $this->auth->authenticate();
 
-        if (!preg_match('/Bearer\s+(\S+)/', $auth_header, $matches)) {
-            log_message('error', 'Profile authenticate - No valid Bearer token found');
-            $this->output->set_content_type('application/json')->set_status_header(401);
-            echo json_encode(['status' => 'error', 'message' => 'Token required']);
-            exit;
-        }
+    if(!$userId){
+        $this->output->set_content_type('application/json')->set_status_header(401);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
+        exit;
+    }
 
-        $token = $matches[1];
-        log_message('debug', 'Profile authenticate - Token extracted: ' . $token);
-        $this->user_id = $this->Token_model->verify($token);
-
-        if (!$this->user_id) {
-            log_message('error', 'Profile authenticate - Token verification failed for token: ' . $token);
-            $this->output->set_content_type('application/json')->set_status_header(401);
-            echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
-            exit;
-        }
-        log_message('debug', 'Profile authenticate - Token verified, user_id: ' . $this->user_id);
+    $this->user_id = $userId;
     }
 
     public function index()
@@ -124,7 +113,7 @@ class Profile extends CI_Controller
             }
 
             if (!empty($_FILES['profile_pic']['name'])) {
-                $config['upload_path'] = './Uploads/profile_pics/';
+                $config['upload_path'] = './uploads/profile_pics/';
                 $config['allowed_types'] = 'jpg|jpeg|png|gif';
                 $config['max_size'] = 2048;
                 $config['file_name'] = time() . '_profile_' . $this->user_id;
@@ -137,7 +126,7 @@ class Profile extends CI_Controller
 
                 if ($this->upload->do_upload('profile_pic')) {
                     $upload_data = $this->upload->data();
-                    $update_data['profile_pic'] = 'Uploads/profile_pics/' . $upload_data['file_name'];
+                    $update_data['profile_pic'] = 'uploads/profile_pics/' . $upload_data['file_name'];
                 } else {
                     $this->output->set_status_header(400);
                     echo json_encode(['status' => 'error', 'message' => $this->upload->display_errors('', '')]);

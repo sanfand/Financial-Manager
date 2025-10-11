@@ -5,18 +5,18 @@ class Category_model extends CI_Model
 
     public function get_categories($user_id = null)
     {
-        if ($user_id) {
-            $this->db->where('user_id', $user_id);
-        }
+        // if ($user_id) {
+        //     $this->db->where('user_id', $user_id);
+        // }
         $query = $this->db->get('categories');
         return $query->result();
     }
 
     public function count_categories($user_id = null)
     {
-        if ($user_id) {
-            $this->db->where('user_id', $user_id);
-        }
+        // if ($user_id) {
+        //     $this->db->where('user_id', $user_id);
+        // }
         $this->db->from($this->table);
         return $this->db->count_all_results();
     }
@@ -42,7 +42,7 @@ class Category_model extends CI_Model
             return ['status' => 'error', 'message' => 'Invalid data'];
         }
         $this->db->where('id', $data['id']);
-        $this->db->where('user_id', $data['user_id']);
+        // $this->db->where('user_id', $data['user_id']);
         $this->db->update('categories', ['name' => $data['name'], 'type' => $data['type']]);
         if ($this->db->affected_rows() > 0) {
             $this->db->where('id', $data['id']);
@@ -58,7 +58,7 @@ class Category_model extends CI_Model
     public function delete_category($id, $user_id)
     {
         $this->db->where('id', $id);
-        $this->db->where('user_id', $user_id);
+        // $this->db->where('user_id', $user_id);
         $this->db->delete('categories');
         if ($this->db->affected_rows() > 0) {
             return ['status' => 'success'];
@@ -68,7 +68,7 @@ class Category_model extends CI_Model
 
     public function search_categories($user_id, $filters)
     {
-        $this->db->where('user_id', $user_id);
+        // $this->db->where('user_id', $user_id);
 
         if (!empty($filters['search'])) {
             $this->db->like('name', $filters['search']);
@@ -104,14 +104,14 @@ class Category_model extends CI_Model
     public function is_category_used($id, $user_id)
     {
         $this->db->where('category_id', $id);
-        $this->db->where('user_id', $user_id);
+        // $this->db->where('user_id', $user_id);
         $this->db->from('transactions');
         return $this->db->count_all_results() > 0;
     }
 
     public function get_user_categories($user_id)
     {
-        $this->db->where('user_id', $user_id);
+        // $this->db->where('user_id', $user_id);
         $query = $this->db->get('categories');
         return $query->result();
     }

@@ -10,8 +10,9 @@ class Dashboard extends CI_Controller
         parent::__construct();
         $this->load->model('Transaction_model');
         $this->load->model('Token_model');
-        $this->load->model('User_model'); // ADD THIS LINE
+        $this->load->model('User_model'); 
         $this->load->helper('url');
+        $this->load->library("Auth");
 
         header('Access-Control-Allow-Origin: http://localhost:5173');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -26,31 +27,25 @@ class Dashboard extends CI_Controller
         $this->authenticate();
     }
 
+
     private function authenticate()
     {
-        $headers = getallheaders();
-        $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-        
-        if (!preg_match('/Bearer\s+(\S+)/', $auth_header, $matches)) {
-            $this->output->set_content_type('application/json')->set_status_header(401);
-            echo json_encode(['status' => 'error', 'message' => 'Token required']);
-            exit;
-        }
-        
-        $token = $matches[1];
-        $this->user_id = $this->Token_model->verify($token);
-        
-        if (!$this->user_id) {
-            $this->output->set_content_type('application/json')->set_status_header(401);
-            echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
-            exit;
-        }
+    $this->load->library('Auth');
+    $userId = $this->auth->authenticate();
+
+    if(!$userId){
+        $this->output->set_content_type('application/json')->set_status_header(401);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid or expired token']);
+        exit;
+    }
+
+    $this->user_id = $userId;
     }
 
     public function index()
-    {
-        $this->output->set_content_type('application/json');
-        
+{
+    $this->output->set_content_type('application/json');
+    
         try {
             $this->db->select('type, SUM(amount) as total');
             $this->db->where('user_id', $this->user_id);
@@ -68,11 +63,13 @@ class Dashboard extends CI_Controller
                 }
             }
 
+            //  Get recent transactions with proper joins
             $this->db->select('t.*, c.name as category_name');
             $this->db->from('transactions t');
             $this->db->join('categories c', 'c.id = t.category_id', 'left');
             $this->db->where('t.user_id', $this->user_id);
             $this->db->order_by('t.occurred_at', 'DESC');
+            $this->db->order_by('t.created_at', 'DESC');
             $this->db->limit(5);
             $recent_transactions = $this->db->get()->result();
 
